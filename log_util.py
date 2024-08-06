@@ -25,16 +25,16 @@ class Logger:
         """
         use_wandb : True / False / wandb module
         """
-        self.log_interval = log_interval
-        self.metrics = {}
+        self.metrics = []
         self.n_iter = 0
+        self.log_interval = log_interval
         self.wandb_interval = wandb_interval
         self.wandb_watch_interval = wandb_watch_interval
         self.wandb_run = wandb_run
 
     @classmethod
     def from_args(cls, args, use_wandb=True):
-        # use_wandb : True / False / wandb module
+        # use_wandb : True / False / wandb run
         if use_wandb:
             run = wandb.init(project=args.experiment_name, config=args)
         return cls(args.log_interval, args.wandb_interval, args.wandb_watch_interval, run)
@@ -61,28 +61,40 @@ class Logger:
                 if module.weight.grad is not None:
                     hist(f"weight_grad/{module.name}", module.weight.grad)
 
-
     def log(self, metrics: Dict[str, float]) -> None:
-        if self.n_iter % self.log_interval == 0:
+        if self.log_interval != -1 and self.n_iter % self.log_interval == 0:
             for key, value in metrics.items():
                 if isinstance(value, torch.Tensor):
                     value = value.item()
-                if key not in self.metrics:
-                    self.metrics[key] = [value]
-                else:
-                    self.metrics[key].append(value)
-        if self.wandb_run and self.n_iter % self.wandb_interval == 0:
+                metrics[key] = value
+            self.metrics.append(metrics)
+        if self.wandb_run and self.wandb_interval != -1 and self.n_iter % self.wandb_interval == 0:
             self.wandb_run.log(metrics, step=self.n_iter)
         self.n_iter += 1
 
+    def log_same_iter(self, metrics: Dict[str, float]) -> None:
+        try:
+            previous_metrics:dict  = self.metrics[-1]
+        except:
+            print("no previous metrics")
+            return
+        for key, value in metrics.items():
+            if isinstance(value, torch.Tensor):
+                value = value.item()
+            metrics[key] = value
+        previous_metrics.update(metrics)
+        if self.wandb_run:
+            self.wandb_run.log(metrics, step=self.n_iter)
+
     def to_df(self) -> pd.DataFrame:
-        return pd.DataFrame(self.metrics)
+        try: 
+            return pd.DataFrame(self.metrics)
+        except:
+            print("Cannot convert to csv")
+            return pd.DataFrame()
 
     def to_csv(self, path: str) -> None:
         self.to_df().to_csv(path)
-
-    def should_log(self) -> bool:
-        return self.n_iter % self.log_interval == 0
 
     def reset(self) -> None:
         self.metrics = {}
