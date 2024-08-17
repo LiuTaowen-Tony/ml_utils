@@ -8,11 +8,15 @@ import argparse
 
 import wandb.wandb_run
 
+LOG_INTERVAL = 1
+WANDB_INTERVAL = 50
+WANDB_WATCH_INTERVAL = 1000
+
 def add_log_args(parser : argparse.ArgumentParser, 
                  defualt_experiment_name : str = "trial",
-                 default_log_interval : int = 50,
-                 default_wandb_interval : int = 50,
-                 default_wandb_watch_interval : int = 1000):
+                 default_log_interval : int = LOG_INTERVAL,
+                 default_wandb_interval : int = WANDB_INTERVAL,
+                 default_wandb_watch_interval : int = WANDB_WATCH_INTERVAL):
     parser.add_argument("--log_interval", type=int, default=default_log_interval)
     parser.add_argument("--wandb_interval", type=int, default=default_wandb_interval)
     parser.add_argument("--wandb_watch_interval", type=int, default=default_wandb_watch_interval)
@@ -21,7 +25,11 @@ def add_log_args(parser : argparse.ArgumentParser,
 
 
 class Logger:
-    def __init__(self, log_interval=50, wandb_interval=50, wandb_watch_interval=1000, wandb_run: wandb.wandb_run.Run =None):
+    def __init__(self, 
+                 log_interval=LOG_INTERVAL, 
+                 wandb_interval=WANDB_INTERVAL, 
+                 wandb_watch_interval=WANDB_WATCH_INTERVAL, 
+                 wandb_run: wandb.wandb_run.Run =None):
         """
         use_wandb : True / False / wandb module
         """
