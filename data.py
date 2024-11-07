@@ -17,3 +17,12 @@ class IterableSubset(IterableDataset):
     def __len__(self):
         return self.max_length
 
+    def state_dict(self):
+        return {"dataset_state_dict": self.dataset.state_dict(),
+                "start": self.start,
+                "max_length": self.max_length}
+
+    def load_state_dict(self, state_dict):
+        self.dataset.load_state_dict(state_dict["dataset_state_dict"])
+        self.start = state_dict["start"]
+        self.max_length = state_dict["max_length"]
