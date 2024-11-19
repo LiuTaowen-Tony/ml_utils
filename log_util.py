@@ -48,6 +48,10 @@ class Logger:
         return cls(args.log_interval, args.wandb_interval, args.wandb_watch_interval, run)
 
     def log_hists(self, model: torch.nn.Module, x, y):
+        if self.wandb_run is None:
+            return
+        if self.n_iter % self.wandb_watch_interval != 0:
+            return
         def hist(name, data):
             self.wandb_run.log({f"{name}_log2": wandb.Histogram(torch.log(data.detach().cpu()))}, step=self.n_iter)
         def act_hook(module, input, output):
