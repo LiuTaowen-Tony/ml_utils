@@ -1,12 +1,8 @@
-import wandb
-import sys
 from typing import Dict
-import numpy as np
 import pandas as pd
 import torch
 import argparse
 
-import wandb.wandb_run
 
 LOG_INTERVAL = 1
 WANDB_INTERVAL = 50
@@ -29,7 +25,7 @@ class Logger:
                  log_interval=LOG_INTERVAL, 
                  wandb_interval=WANDB_INTERVAL, 
                  wandb_watch_interval=WANDB_WATCH_INTERVAL, 
-                 wandb_run: wandb.wandb_run.Run =None):
+                 wandb_run: "wandb.wandb_run.Run" =None):
         """
         use_wandb : True / False / wandb module
         """
@@ -44,10 +40,12 @@ class Logger:
     def from_args(cls, args, use_wandb=True):
         # use_wandb : True / False / wandb run
         if use_wandb:
+            import wandb
             run = wandb.init(project=args.experiment_name, config=args)
         return cls(args.log_interval, args.wandb_interval, args.wandb_watch_interval, run)
 
     def log_hists(self, model: torch.nn.Module, x, y):
+        import wandb
         if self.wandb_run is None:
             return
         if self.n_iter % self.wandb_watch_interval != 0:
