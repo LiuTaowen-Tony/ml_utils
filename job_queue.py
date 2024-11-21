@@ -1,19 +1,20 @@
 import time
 from threading import Thread 
+import subprocess
 
 class JobQueue:
-    def __init__(self, num_devices, max_job_per_device):
-        self.num_devices = num_devices
+    def __init__(self, device_list, max_job_per_device):
+        self.device_list = device_list
+        self.num_devices = len(device_list)
         self.max_job_per_device = max_job_per_device
-        self.device_counters = [0] * num_devices
-        self.running_processes = [None] * num_devices
+        self.device_counters = [0] * self.num_devices
         self.wait_list = []
 
-    def get_thread(self, callable):
+    def cmd_to_thread(self, cmd):
         # callable : device -> None
 
         while True:
-            for device in range(self.num_devices):
+            for device in self.device_list:
                 if self.device_counters[device] < self.max_job_per_device:
                     self.device_counters[device] += 1
                     break
@@ -23,15 +24,15 @@ class JobQueue:
             break
         def job():
             try:
-                callable(device)
+                subprocess.run(f"CUDA_VISIBLE_DEVICES={device} {cmd}", shell=True)
             finally:
                 self.device_counters[device] -= 1
 
         return Thread(target=job)
 
-    def map(self, callable_list):
-        for callable in callable_list:
-            thread = self.get_thread(callable)
+    def map(self, cmd_list):
+        for cmd in cmd_list:
+            thread = self.cmd_to_thread(cmd)
             thread.start()
             self.wait_list.append(thread)
         self.wait_all()
