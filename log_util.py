@@ -44,6 +44,7 @@ class Logger:
             run = wandb.init(project=args.experiment_name, config=args)
         return cls(args.log_interval, args.wandb_interval, args.wandb_watch_interval, run)
 
+
     def log_hists(self, model: torch.nn.Module, x, y):
         import wandb
         if self.wandb_run is None:
