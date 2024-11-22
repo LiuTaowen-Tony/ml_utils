@@ -1,4 +1,3 @@
-
 import dataclasses
 from typing import Dict, Any, List
 import pandas as pd
@@ -168,7 +167,7 @@ class Logger:
 
 
 class ExperimentMetrics:
-    def __init__(self, directory: str):
+    def __init__(self, directory: str, lazy=False):
         """
         Initialize the ExperimentLoader.
 
@@ -181,6 +180,8 @@ class ExperimentMetrics:
 
         # Load experiment configuration upon initialization
         self._load_runs_config()
+        if not lazy:
+            self._load_runs()
 
     def _load_runs_config(self):
         """
@@ -193,7 +194,22 @@ class ExperimentMetrics:
             except Exception as e:
                 print(f"Failed to load experiment configuration: {e}")
         else:
-            print("Experiment configuration file not found.")
+            print(f"Experiment configuration file not found at {config_path}")
+
+
+    def _load_runs(self):
+        for run_id in self.run_ids:
+            file_path = os.path.join(self.directory, f"run_{run_id}.csv")
+            if os.path.exists(file_path):
+                try:
+                    run = pd.read_csv(file_path)
+                    self._runs[run_id] = run
+                except Exception as e:
+                    print(f"Failed to load run data for {run_id}: {e}")
+                    raise e
+            else:
+                print(f"Run file for {run_id} not fou d.")
+                raise FileNotFoundError(f"Run file for {run_id} not found.")
 
 
     def save(self, directory, experiment_name):
@@ -205,13 +221,11 @@ class ExperimentMetrics:
         """
         os.makedirs(os.path.join(directory, experiment_name), exist_ok=True)
         self.runs_summary.to_csv(os.path.join(directory, experiment_name, "runs_summary.csv"), index=False)
-        for run_id in self.runs():
+        for run_id in self.runs:
             self._runs[run_id].to_csv(os.path.join(directory, experiment_name,f"run_{run_id}.csv"), index=False)
 
     @property
     def runs(self):
-        for run_id in self.run_ids:
-            self.__getitem__(run_id)
         return self._runs
 
     def __getitem__(self, run_id: str):
@@ -224,21 +238,9 @@ class ExperimentMetrics:
         Returns:
             pd.DataFrame: The metrics for the specified run, or None if not found.
         """
-        if run_id in self._runs:
-            return self._runs[run_id].copy()
+        return self.runs[run_id]
 
-        file_path = os.path.join(self.directory, f"run_{run_id}.csv")
-        if os.path.exists(file_path):
-            try:
-                run = pd.read_csv(file_path)
-                self._runs[run_id] = run
-                return run.copy()
-            except Exception as e:
-                print(f"Failed to load run data for {run_id}: {e}")
-                return None
-        else:
-            print(f"Run file for {run_id} not found.")
-            return None
+      
 
     @property
     def run_ids(self) -> List[str]:
@@ -249,9 +251,9 @@ class ExperimentMetrics:
             List[str]: A list of run IDs.
         """
         if self.runs_summary is not None:
-            return self.runs_summary["run_id"].unique().tolist()
+            return [i for i in self.runs_summary["run_id"]]
         else:
             print("Experiment configuration not loaded.")
             return []
 
-    
+

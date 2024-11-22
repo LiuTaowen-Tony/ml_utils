@@ -6,7 +6,7 @@ import tempfile
 import shutil
 import uuid
 from unittest.mock import Mock, patch
-from ml_utils.log_util import Logger, LoggerArgs, ExperimentMetrics  # Update import to match your file
+from ml_utils.log_util import Logger, LoggerArgs, ExperimentMetrics
 
 class TestLoggerBasics(unittest.TestCase):
     def setUp(self):
@@ -186,14 +186,6 @@ class TestLoggerFileOperations(unittest.TestCase):
         nested_dir = os.path.join(self.test_dir, "nested", "path")
         self.logger.save_experiment(nested_dir)
         self.assertTrue(os.path.exists(os.path.join(nested_dir, "test_experiment")))
-import unittest
-import pandas as pd
-import torch
-import os
-import tempfile
-import shutil
-from unittest.mock import Mock, patch
-from dataclasses import dataclass
 
 @dataclass
 class MockHyperParams:
@@ -264,6 +256,50 @@ class TestWandbIntegration(unittest.TestCase):
         }
         self.assertEqual(logger.hyper_params_dict, expected_params)
 
+class TestLoggerLogFormat(unittest.TestCase):
+    def setUp(self):
+        self.logger = Logger(experiment_name="test_experiment")
+
+    def test_log_format_single_metric(self):
+        """Test log format for a single metric"""
+        self.logger.log({"loss": 0.5})
+        self.assertIn("loss", self.logger.metrics[0])
+        self.assertEqual(self.logger.metrics[0]["loss"], 0.5)
+
+    def test_log_format_multiple_metrics(self):
+        """Test log format for multiple metrics"""
+        metrics = {"loss": 0.5, "accuracy": 0.95}
+        self.logger.log(metrics)
+        self.assertIn("loss", self.logger.metrics[0])
+        self.assertIn("accuracy", self.logger.metrics[0])
+        self.assertEqual(self.logger.metrics[0]["loss"], 0.5)
+        self.assertEqual(self.logger.metrics[0]["accuracy"], 0.95)
+
+    def test_log_format_nested_metrics(self):
+        """Test log format for nested metrics"""
+        nested_metrics = {
+            "training": {"loss": 0.5, "accuracy": 0.95},
+            "validation": {"loss": 0.6, "accuracy": 0.93}
+        }
+        self.logger.log(nested_metrics)
+        self.assertIn("training", self.logger.metrics[0])
+        self.assertIn("validation", self.logger.metrics[0])
+        self.assertEqual(self.logger.metrics[0]["training"]["loss"], 0.5)
+        self.assertEqual(self.logger.metrics[0]["validation"]["accuracy"], 0.93)
+
+    def test_log_format_different_numeric_types(self):
+        """Test log format for different numeric types"""
+        metrics = {
+            "float": 0.5,
+            "int": 42,
+            "scientific": 1.23e-4,
+            "tensor_scalar": torch.tensor(0.7),
+            "tensor_array": torch.tensor([0.8, 0.9]).mean(),
+        }
+        self.logger.log(metrics)
+        for key, value in metrics.items():
+            self.assertIn(key, self.logger.metrics[0])
+            self.assertIsInstance(self.logger.metrics[0][key], (int, float))
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
