@@ -121,7 +121,7 @@ class Logger:
             print("Cannot convert to DataFrame")
             return pd.DataFrame()
 
-    def save_experiment(self, directory: str,):
+    def save_experiment(self, directory: str = "experiment_metrics"):
         """Saves the experiment configuration and metrics.
 
         Args:
