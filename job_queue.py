@@ -1,6 +1,8 @@
 import time
 from threading import Thread 
 import subprocess
+from typing import List, Dict, Callable, Any
+import itertools
 
 class JobQueue:
     def __init__(self, device_list, max_job_per_device):
@@ -10,9 +12,22 @@ class JobQueue:
         self.device_counters = [0] * self.num_devices
         self.wait_list = []
 
-    def cmd_to_thread(self, cmd):
-        # callable : device -> None
+    @staticmethod
+    def expand_param_space(params_space: Dict[str, List], cmd_builder: Callable[[Dict[str, Any]], str]) -> List[str]:
+        # params_space : Dict[str, List]
+        # cmd_builder : Dict[str, Any] -> str
+        # return : List[str]
+        cmd_list = []
+        for values in itertools.product(*params_space.values()):
+            # Create a dictionary of parameters
+            params = {key: value for key, value in zip(params_space.keys(), values)}
+            # Add the job to the queue
+            cmd_list.append(cmd_builder(params))
+        return cmd_list
 
+
+
+    def cmd_to_thread(self, cmd):
         while True:
             for device in self.device_list:
                 if self.device_counters[device] < self.max_job_per_device:
