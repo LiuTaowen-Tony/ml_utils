@@ -1,5 +1,6 @@
+
 import dataclasses
-from typing import Dict, Any
+from typing import Dict, Any, List
 import pandas as pd
 import torch
 import os
@@ -137,7 +138,7 @@ class Logger:
             if not os.path.exists(config_path):
                 pd.DataFrame([config]).to_csv(config_path, index=False)
             else:
-                pd.DataFrame([config]).to_csv(config_path, mode='a', index=False)
+                pd.DataFrame([config]).to_csv(config_path, mode='a', index=False, header=False)
         except Exception as e:
             print(f"Failed to save experiment configuration: {e}")
 
@@ -175,8 +176,8 @@ class ExperimentMetrics:
             directory (str): The directory where experiment data is stored.
         """
         self.directory = directory
-        self.runs_config = None
-        self.runs: Dict[str, pd.DataFrame] = {}
+        self.runs_summary = None
+        self._runs: Dict[str, pd.DataFrame] = {}
 
         # Load experiment configuration upon initialization
         self._load_runs_config()
@@ -188,20 +189,12 @@ class ExperimentMetrics:
         config_path = os.path.join(self.directory, "runs_summary.csv")
         if os.path.exists(config_path):
             try:
-                self.runs_config = pd.read_csv(config_path)
+                self.runs_summary = pd.read_csv(config_path)
             except Exception as e:
                 print(f"Failed to load experiment configuration: {e}")
         else:
             print("Experiment configuration file not found.")
 
-    def get_runs_config(self):
-        """
-        Get the experiment configuration.
-
-        Returns:
-            pd.DataFrame: The experiment configuration.
-        """
-        return self.runs_config.copy()
 
     def save(self, directory, experiment_name):
         """
@@ -211,11 +204,17 @@ class ExperimentMetrics:
             directory (str): The directory to save the experiment data.
         """
         os.makedirs(os.path.join(directory, experiment_name), exist_ok=True)
-        self.runs_config.to_csv(os.path.join(directory, experiment_name, "runs_summary.csv"), index=False)
-        for run_id in self.runs:
-            self.runs[run_id].to_csv(os.path.join(directory, experiment_name,f"run_{run_id}.csv"), index=False)
+        self.runs_summary.to_csv(os.path.join(directory, experiment_name, "runs_summary.csv"), index=False)
+        for run_id in self.runs():
+            self._runs[run_id].to_csv(os.path.join(directory, experiment_name,f"run_{run_id}.csv"), index=False)
 
-    def get_run(self, run_id: str):
+    @property
+    def runs(self):
+        for run_id in self.run_ids:
+            self.__getitem__(run_id)
+        return self._runs
+
+    def __getitem__(self, run_id: str):
         """
         Get the metrics for a specific run, loading on demand if necessary.
 
@@ -225,14 +224,14 @@ class ExperimentMetrics:
         Returns:
             pd.DataFrame: The metrics for the specified run, or None if not found.
         """
-        if run_id in self.runs:
-            return self.runs[run_id].copy()
+        if run_id in self._runs:
+            return self._runs[run_id].copy()
 
         file_path = os.path.join(self.directory, f"run_{run_id}.csv")
         if os.path.exists(file_path):
             try:
                 run = pd.read_csv(file_path)
-                self.runs[run_id] = run
+                self._runs[run_id] = run
                 return run.copy()
             except Exception as e:
                 print(f"Failed to load run data for {run_id}: {e}")
@@ -241,15 +240,16 @@ class ExperimentMetrics:
             print(f"Run file for {run_id} not found.")
             return None
 
-    def run_ids(self):
+    @property
+    def run_ids(self) -> List[str]:
         """
         List all run IDs available in the experiment from the experiment configuration.
 
         Returns:
             List[str]: A list of run IDs.
         """
-        if self.runs_config is not None:
-            return self.runs_config["run_id"].unique().tolist()
+        if self.runs_summary is not None:
+            return self.runs_summary["run_id"].unique().tolist()
         else:
             print("Experiment configuration not loaded.")
             return []
