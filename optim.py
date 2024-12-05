@@ -1,5 +1,9 @@
+from torch import nn
 import math
 from torch.optim.lr_scheduler import _LRScheduler
+import torch.optim
+from torch.optim.optimizer import Optimizer
+import typing
 
 class LinearWarmupCosineAnnealingLR(_LRScheduler):
     def __init__(self, optimizer, warmup_steps, max_steps, eta_min=0, last_step=-1):
@@ -27,3 +31,33 @@ class LinearWarmupCosineAnnealingLR(_LRScheduler):
             self.last_step += 1
         for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
             param_group['lr'] = lr
+
+Params = typing.Dict[str, torch.Tensor]
+OptimizerFactory = typing.Callable[[Params], torch.optim.Optimizer]
+SchedulerFactory = typing.Callable[[torch.optim.Optimizer], _LRScheduler]
+
+def escape_non_decay(model: nn.Module, optimizer_factory: OptimizerFactory, scheduler_factory: SchedulerFactory, weight_decay: float) -> Params:
+    param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
+    decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
+    nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+    optim_groups = [
+        {"params": decay_params, "weight_decay": weight_decay},
+        {"params": nodecay_params, "weight_decay": 0.0},
+    ]
+    num_decay_params = sum(p.numel() for p in decay_params)
+    num_nodecay_params = sum(p.numel() for p in nodecay_params)
+    print(
+        f"num decayed parameter tensors: {len(decay_params)}, with {num_decay_params:,} parameters"
+    )
+    print(
+        f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters"
+    )
+    optimizer = optimizer_factory(optim_groups)
+    scheduler = scheduler_factory(optimizer)
+    return {
+        "optimizer": optimizer,
+        "lr_scheduler": {
+            "scheduler": scheduler,
+            "interval": "step",
+        },
+    }

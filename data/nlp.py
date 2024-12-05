@@ -1,5 +1,4 @@
-import inspect
-import functools
+import typing
 import torch
 from transformers import PreTrainedTokenizerFast
 
@@ -7,6 +6,50 @@ from transformers import PreTrainedTokenizerFast
 def text_token_numbers(tokenizer: PreTrainedTokenizerFast, text):
     # Tokenize the text and count the number of tokens
     return tokenizer.encode(text, return_tensors="pt").numel()
+
+
+def pad_to_length(tensor: torch.Tensor, length: int, pad_value: typing.Union[int, float], dim: int = -1) -> torch.Tensor:
+    """ Pad a tensor to a specific length along a specific dimension
+    """
+    if tensor.size(dim) >= length:
+        return tensor
+    else:
+        pad_size = list(tensor.shape)
+        pad_size[dim] = length - tensor.size(dim)
+        return torch.cat([tensor, pad_value * torch.ones(*pad_size, dtype=tensor.dtype, device=tensor.device)], dim=dim)
+
+
+def extract_anthropic_prompt(prompt_and_response):
+    """Extract the anthropic prompt from a prompt and response pair."""
+    search_term = '\n\nAssistant:'
+    search_term_idx = prompt_and_response.rfind(search_term)
+    assert search_term_idx != -1, f"Prompt and response does not contain '{search_term}'"
+    return prompt_and_response[:search_term_idx + len(search_term)]
+
+
+def strip_html_tags(html_string):
+    from bs4 import BeautifulSoup, NavigableString
+    """Strip HTML tags from a string, except for <code> tags (which contain real code in the StackExchange answers)."""
+    # Create a BeautifulSoup object
+    soup = BeautifulSoup(html_string, 'html.parser')
+
+    # Initialize an empty list to store the text
+    text = []
+    for element in soup.children:
+        if isinstance(element, NavigableString):
+            continue
+        if element.name == 'p':
+            text.append(''.join(child.string for child in element.children if isinstance(child, NavigableString)))
+        elif element.name == 'pre':
+            for code in element.find_all('code'):
+                text.append("<code>" + code.get_text() + "</code>")
+        elif element.name == 'code':
+            text.append("<code>" + element.get_text() + "</code>")
+
+    # Join the text together with newlines in between
+    text = "\n\n".join(text)
+
+    return text
 
 
 def apply_chat_template(messages):
