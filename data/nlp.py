@@ -8,6 +8,32 @@ def text_token_numbers(tokenizer: PreTrainedTokenizerFast, text):
     return tokenizer.encode(text, return_tensors="pt").numel()
 
 
+def boolean_triangular_mask(flat_mask: torch.Tensor) -> torch.Tensor:
+    assert flat_mask.dim() < 3, "Input tensor should be 1D or 2D"
+    if flat_mask.dim() == 1:
+        flat_mask = flat_mask.unsqueeze(0)
+
+    batch_size, seq_len = flat_mask.size()
+
+    # external product of flat_mask with itself
+    tri_mask = flat_mask.unsqueeze(2) & flat_mask.unsqueeze(1)
+    
+    # upper triangular mask
+    upper_mask = torch.triu(torch.ones(seq_len, seq_len, dtype=torch.bool, device=flat_mask.device), diagonal=1)
+    lower_mask = upper_mask.logical_not()
+
+    tri_mask = tri_mask & lower_mask
+    return tri_mask
+
+
+
+
+    # # tri_mask = torch.triu(torch.ones(batch_size, seq_len, seq_len, dtype=torch.bool), diagonal=1)
+    # # tri_mask = tri_mask.logical_not()
+
+    # return flat_mask.unsqueeze(1) & tri_mask
+
+
 def pad_to_length(tensor: torch.Tensor, length: int, pad_value: typing.Union[int, float], dim: int = -1) -> torch.Tensor:
     """ Pad a tensor to a specific length along a specific dimension
     """
