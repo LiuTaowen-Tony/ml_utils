@@ -1,5 +1,5 @@
 import unittest
-from ml_utils.data.nlp import *
+from sequence_modelling import *
 
 
 class TestNLP(unittest.TestCase):
