@@ -36,5 +36,5 @@ def load_with_config(config_class, path: str):
     with open(os.path.join(path, "config.json"), "r") as f:
         config = config_class(**json.load(f))
     model = config.build_model()
-    model.load_state_dict(torch.load(os.path.join(path, "model.pth")))
+    model.load_state_dict(torch.load(os.path.join(path, "model.pth"), weights_only=True))
     return model
