@@ -4,6 +4,7 @@ from torch.optim.lr_scheduler import _LRScheduler
 import torch.optim
 from torch.optim.optimizer import Optimizer
 import typing
+from .dist import rank0_print
 
 class LinearWarmupCosineAnnealingLR(_LRScheduler):
     def __init__(self, optimizer, warmup_steps, max_steps, eta_min=0, last_step=-1):
@@ -46,10 +47,10 @@ def escape_non_decay(model: nn.Module, optimizer_factory: OptimizerFactory, sche
     ]
     num_decay_params = sum(p.numel() for p in decay_params)
     num_nodecay_params = sum(p.numel() for p in nodecay_params)
-    print(
+    rank0_print(
         f"num decayed parameter tensors: {len(decay_params)}, with {num_decay_params:,} parameters"
     )
-    print(
+    rank0_print(
         f"num non-decayed parameter tensors: {len(nodecay_params)}, with {num_nodecay_params:,} parameters"
     )
     optimizer = optimizer_factory(optim_groups)

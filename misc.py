@@ -31,10 +31,10 @@ def save_with_config(model: torch.nn.Module, path: str, config: dict = None):
             json.dump(config.__dict__, f)
     torch.save(model.state_dict(), os.path.join(path, "model.pth"))
 
-def load_with_config(config_class, model_class, path: str):
+def load_with_config(config_class, path: str):
     """Load model with configuration."""
-    with open(os.join(path, "config.json"), "r") as f:
+    with open(os.path.join(path, "config.json"), "r") as f:
         config = config_class(**json.load(f))
-    model = model_class(**config, config=config)
+    model = config.build_model()
     model.load_state_dict(torch.load(os.path.join(path, "model.pth")))
     return model

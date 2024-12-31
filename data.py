@@ -1,6 +1,16 @@
+import json
 import inspect
 import torch
 from torch.utils.data import Dataset, IterableDataset
+
+def load_jsonl(file_path):
+    with open(file_path, "r") as f:
+        return [json.loads(line) for line in f]
+
+def save_jsonl(file_path, data):
+    with open(file_path, "w") as f:
+        for item in data:
+            f.write(json.dumps(item) + "\n")
 
 class IterableSubset(IterableDataset):
     def __init__(self, dataset: Dataset, max_length: int, start: int = 0):

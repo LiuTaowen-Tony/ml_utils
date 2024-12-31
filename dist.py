@@ -20,6 +20,8 @@ def all_gather_concat(values: torch.Tensor, rank: int, world_size: int) -> torch
 
 def all_gather_concat_pl(self: pl.LightningModule, values: torch.Tensor, sync_grads:bool = False) -> torch.Tensor:
     """Gather and stack/cat values from all processes, if there are multiple processes."""
+    if self.trainer.world_size == 1:
+        return values
     all_values = self.all_gather(values, sync_grads=sync_grads)
     # concate the first dimension
     return all_values.view(-1, *all_values.size()[2:])
