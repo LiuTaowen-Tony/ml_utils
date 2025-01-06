@@ -6,13 +6,53 @@ from torch.optim.optimizer import Optimizer
 import typing
 from .dist import rank0_print
 
+
 class LinearWarmupCosineAnnealingLR(_LRScheduler):
-    def __init__(self, optimizer, warmup_steps, max_steps, eta_min=0, last_step=-1):
-        self.warmup_steps = warmup_steps
+    def __init__(self, 
+        optimizer: Optimizer, 
+        warmup_steps: typing.Union[int, float], 
+        max_steps: int, 
+        eta_min: typing.Union[float, list[float]]=0, 
+        eta_min_type: str="absolute",
+        last_epoch: int=-1):
+        """
+        Args:
+            optimizer: Optimizer
+            warmup_steps: int | float
+                Number of steps for linear warmup. If float, it is considered as a percentage.
+            max_steps: int
+                Total number of steps for training
+            eta_min: float | list[float] 
+                Minimum learning rate.
+                as the minimum learning rate. (Default: 0)
+            eta_min_type: str
+                Type of eta_min. 
+                - "absolute": The minimum learning rate is the same for all parameter groups.
+                - "relative": The minimum learning rate is a percentage of the initial learning rate.
+            last_epoch: 
+                The index of last epoch. (Default: -1)
+        """
         self.max_steps = max_steps
-        self.eta_min = eta_min
+
+        assert warmup_steps <= max_steps, "warmup_steps should be less than max_steps"
+        assert warmup_steps >= 0, "warmup_steps should be non-negative"
+        if 0 < warmup_steps and warmup_steps < 1:
+            warmup_steps = int(warmup_steps * max_steps)
+        self.warmup_steps = warmup_steps
+
+        self.eta_mins = eta_min
+        if isinstance(eta_min, (int, float)):
+            self.eta_mins = [eta_min] * len(optimizer.param_groups)
+
+        assert len(self.eta_mins) == len(optimizer.param_groups), "eta_min should have the same length as optimizer.param_groups"
+
+        for i in range(len(self.eta_mins)):
+            assert 0 <= self.eta_mins[i], "eta_min should be non-negative"
+            if eta_min_type == "relative":
+                self.eta_mins[i] = self.eta_mins[i] * optimizer.param_groups[i]["lr"]
+
         self.last_step = 0
-        super().__init__(optimizer, last_step)
+        super().__init__(optimizer, last_epoch)
 
     def get_lr(self):
         if self.last_step < self.warmup_steps:
@@ -21,8 +61,17 @@ class LinearWarmupCosineAnnealingLR(_LRScheduler):
             return [base_lr * warmup_factor for base_lr in self.base_lrs]
         else:
             # Cosine annealing
-            cosine_decay = 0.5 * (1 + math.cos(math.pi * (self.last_step - self.warmup_steps) / (self.max_steps - self.warmup_steps)))
-            return [self.eta_min + (base_lr - self.eta_min) * cosine_decay for base_lr in self.base_lrs]
+            cosine_decay = 0.5 * (
+                1
+                + math.cos(
+                    math.pi
+                    * (self.last_step - self.warmup_steps)
+                    / (self.max_steps - self.warmup_steps)
+                )
+            )
+            return [
+                eta_min + (base_lr - eta_min) * cosine_decay for base_lr, eta_min in zip(self.base_lrs, self.eta_mins)
+            ]
 
     def step(self, step=None):
         """Update the learning rate per step (batch) instead of per epoch."""
@@ -31,13 +80,27 @@ class LinearWarmupCosineAnnealingLR(_LRScheduler):
         else:
             self.last_step += 1
         for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
-            param_group['lr'] = lr
+            param_group["lr"] = lr
+
 
 Params = typing.Dict[str, torch.Tensor]
 OptimizerFactory = typing.Callable[[Params], torch.optim.Optimizer]
 SchedulerFactory = typing.Callable[[torch.optim.Optimizer], _LRScheduler]
 
-def escape_non_decay(model: nn.Module, optimizer_factory: OptimizerFactory, scheduler_factory: SchedulerFactory, weight_decay: float) -> Params:
+
+def get_decay_non_decay(model: nn.Module) -> typing.List[nn.Parameter]:
+    param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
+    decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
+    nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+    return decay_params, nodecay_params
+
+
+def escape_non_decay(
+    model: nn.Module,
+    optimizer_factory: OptimizerFactory,
+    scheduler_factory: SchedulerFactory,
+    weight_decay: float,
+) -> Params:
     param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
     decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
     nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]

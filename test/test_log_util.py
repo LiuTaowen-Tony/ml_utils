@@ -233,7 +233,7 @@ class TestWandbIntegration(unittest.TestCase):
 
         @dataclass
         class ModelParams:
-            hidden_size: int = 256
+            hidden_dim: int = 256
             num_layers: int = 2
 
         args = LoggerArgs(experiment_name="test_experiment")
@@ -251,7 +251,7 @@ class TestWandbIntegration(unittest.TestCase):
             "batch_size": 32,
             "epochs": 100,
             "optimizer": "adam",
-            "hidden_size": 256,
+            "hidden_dim": 256,
             "num_layers": 2
         }
         self.assertEqual(logger.hyper_params_dict, expected_params)

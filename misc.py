@@ -9,6 +9,10 @@ def disable_dropout(model: torch.nn.Module):
         if isinstance(module, torch.nn.Dropout):
             module.p = 0
 
+def to_model_device(tensor: torch.Tensor, model: torch.nn.Module) -> torch.Tensor:
+    """Move tensor to device of model."""
+    return tensor.to(next(model.parameters()).device)
+
 
 def relative_path(file_path: str, underscore_file) -> str:
     return (pathlib.Path(underscore_file).parent / file_path).as_posix()
@@ -31,7 +35,7 @@ def save_with_config(model: torch.nn.Module, path: str, config: dict = None):
             json.dump(config.__dict__, f)
     torch.save(model.state_dict(), os.path.join(path, "model.pth"))
 
-def load_with_config(config_class, path: str):
+def load_with_config(config_class, path: str) -> torch.nn.Module:
     """Load model with configuration."""
     with open(os.path.join(path, "config.json"), "r") as f:
         config = config_class(**json.load(f))
