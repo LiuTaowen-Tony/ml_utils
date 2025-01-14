@@ -2,6 +2,7 @@ import json
 import os
 import pathlib
 import torch
+import dataclasses
 
 def disable_dropout(model: torch.nn.Module):
     """Disable dropout in a model."""
@@ -32,7 +33,7 @@ def save_with_config(model: torch.nn.Module, path: str, config: dict = None):
         if isinstance(config, dict):
             json.dump(config, f)
         else:
-            json.dump(config.__dict__, f)
+            json.dump(dataclasses.asdict(config), f)
     torch.save(model.state_dict(), os.path.join(path, "model.pth"))
 
 def load_with_config(config_class, path: str) -> torch.nn.Module:
