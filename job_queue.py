@@ -29,9 +29,9 @@ class JobQueue:
 
     def cmd_to_thread(self, cmd):
         while True:
-            for device in self.device_list:
-                if self.device_counters[device] < self.max_job_per_device:
-                    self.device_counters[device] += 1
+            for i in range(len(self.device_list)):
+                if self.device_counters[i] < self.max_job_per_device:
+                    self.device_counters[i] += 1
                     break
             else:
                 time.sleep(1)
@@ -39,9 +39,9 @@ class JobQueue:
             break
         def job():
             try:
-                subprocess.run(f"CUDA_VISIBLE_DEVICES={device} {cmd}", shell=True)
+                subprocess.run(f"CUDA_VISIBLE_DEVICES={self.device_list[i]} {cmd}", shell=True)
             finally:
-                self.device_counters[device] -= 1
+                self.device_counters[i] -= 1
 
         return Thread(target=job)
 
