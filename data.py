@@ -1,6 +1,7 @@
 import json
 import inspect
 import torch
+import numpy as np
 from torch.utils.data import Dataset, IterableDataset
 
 def load_jsonl(file_path):
