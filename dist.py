@@ -1,7 +1,6 @@
 import torch
 import torch.distributed as dist
 
-
 class AllGatherFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, tensor: torch.Tensor, reduce_dtype: torch.dtype = torch.float32):
@@ -45,6 +44,7 @@ def all_gather_concat(values: torch.Tensor, rank: int, world_size: int) -> torch
     return cat_function(all_values, dim=0)
 
 def all_gather_concat_pl(self: "pl.LightningModule", values: torch.Tensor, sync_grads:bool = False) -> torch.Tensor:
+    import pytorch_lightning as pl
     """Gather and stack/cat values from all processes, if there are multiple processes."""
     if self.trainer.world_size == 1:
         return values
