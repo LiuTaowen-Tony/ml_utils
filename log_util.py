@@ -2,6 +2,7 @@ import dataclasses
 from typing import Dict, Any, List
 import pandas as pd
 import torch
+from tqdm import tqdm
 import os
 import uuid
 
@@ -165,6 +166,24 @@ class Logger:
     def __len__(self):
         return len(self.metrics)
 
+def download_wandb(project_name: str, directory: str = "experiment_metrics"):
+    import wandb
+    api = wandb.Api()
+    runs = api.runs(project_name)
+
+    os.makedirs(os.path.join(directory, project_name), exist_ok=True)
+
+    config_path = os.path.join(directory, project_name, "runs_summary.csv")
+    configs = []
+    for run  in tqdm(runs):
+        config = run.config
+        config["run_id"] = run.id
+        configs.append(config)
+        run_path = os.path.join(directory, project_name, f"run_{run.id}.csv")
+        run.history().to_csv(run_path, index=False)
+
+    pd.DataFrame(configs).to_csv(config_path, index=False)
+
 
 class ExperimentMetrics:
     def __init__(self, directory: str, lazy=False):
@@ -179,11 +198,11 @@ class ExperimentMetrics:
         self._runs: Dict[str, pd.DataFrame] = {}
 
         # Load experiment configuration upon initialization
-        self._load_runs_config()
         if not lazy:
+            self._load_runs_summary()
             self._load_runs()
 
-    def _load_runs_config(self):
+    def _load_runs_summary(self):
         """
         Load the experiment configuration from the runs_summary.csv file.
         """
