@@ -7,7 +7,7 @@ import os
 import uuid
 
 LOG_INTERVAL = 1
-WANDB_INTERVAL = 50
+WANDB_INTERVAL = 1
 WANDB_WATCH_INTERVAL = 1000
 
 @dataclasses.dataclass
