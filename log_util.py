@@ -49,6 +49,8 @@ class Logger:
         if isinstance(hparam_or_hparam_list, list):
             for i in hparam_or_hparam_list:
                 hyper_params_dict.update(i.__dict__)
+        elif isinstance(hyper_params_dict, dict):
+            hyper_params_dict = hparam_or_hparam_list
         else:
             hyper_params_dict = hparam_or_hparam_list.__dict__
 
