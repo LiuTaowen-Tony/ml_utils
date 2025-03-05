@@ -1,3 +1,4 @@
+import sys
 import dataclasses
 from typing import Dict, Any, List
 import pandas as pd
@@ -278,3 +279,5 @@ class ExperimentMetrics:
             return []
 
 
+if __name__ == "__main__":
+    download_wandb(sys.argv[1] )
