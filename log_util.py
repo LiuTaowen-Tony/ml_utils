@@ -6,6 +6,9 @@ import torch
 from tqdm import tqdm
 import os
 import uuid
+from copy import copy, deepcopy
+
+from python_utils.serialize import Serial
 
 LOG_INTERVAL = 1
 WANDB_INTERVAL = 1
@@ -49,11 +52,9 @@ class Logger:
         hyper_params_dict = {}
         if isinstance(hparam_or_hparam_list, list):
             for i in hparam_or_hparam_list:
-                hyper_params_dict.update(i.__dict__)
-        elif isinstance(hyper_params_dict, dict):
-            hyper_params_dict = hparam_or_hparam_list
+                hyper_params_dict.update(Serial.as_dict(i))
         else:
-            hyper_params_dict = hparam_or_hparam_list.__dict__
+            hyper_params_dict = Serial.as_dict(hparam_or_hparam_list)
 
         if use_wandb == True:
             import wandb
@@ -135,7 +136,7 @@ class Logger:
 
         # Save hyper-parameters
         config_path = os.path.join(directory, self.experiment_name,"runs_summary.csv")
-        config = self.hyper_params_dict.copy()
+        config = copy(self.hyper_params_dict)
         config["run_id"] = self.run_id
         try:
             if not os.path.exists(config_path):
