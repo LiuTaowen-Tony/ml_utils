@@ -6,7 +6,7 @@ import tempfile
 import shutil
 import uuid
 from unittest.mock import Mock, patch
-from ml_utils.log_util import Logger, LoggerArgs, ExperimentMetrics
+from ml_utils.log_util import Logger, LoggerArgs, ExperimentRecord
 
 class TestLoggerBasics(unittest.TestCase):
     def setUp(self):

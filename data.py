@@ -3,6 +3,7 @@ import inspect
 import torch
 import numpy as np
 from torch.utils.data import Dataset, IterableDataset
+import torchvision
 
 def load_jsonl(file_path):
     with open(file_path, "r") as f:
@@ -40,6 +41,42 @@ class IterableSubset(IterableDataset):
         self.max_length = state_dict["max_length"]
 
 
+
+class GPUDataset(Dataset):
+    def __init__(self, data, label, device="cuda"):
+        self.data = data.to(device)
+        self.label = label.to(device)
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx], self.label[idx]
+
+    @staticmethod
+    def get_dataset_by_name(cls, name):
+        if name == "cifar10":
+            train = torchvision.datasets.CIFAR10(root="./data", train=True, download=True)
+            test = torchvision.datasets.CIFAR10(root="./data", train=False, download=True)
+            ret = [torch.tensor(i) for i in (train.data, train.targets, test.data, test.targets)]
+            std, mean = torch.std_mean(ret[0].float(), dim=(0, 1, 2), unbiased=True, keepdim=True)
+            for i in [0, 2]:
+                ret[i] = ((ret[i] - mean) / std).to(torch.float32).permute(0, 3, 1, 2)
+            return GPUDataset(ret[0], ret[1]), GPUDataset(ret[2], ret[3])
+        elif "mnist" in name:
+            if "fashion" in name:
+                dataset = torchvision.datasets.FashionMNIST
+            elif "colored" in name:
+                dataset = torchvision.datasets.MNIST
+            else:
+                dataset = torchvision.datasets.MNIST
+            train = dataset(root="./data", train=True, download=True)
+            test = dataset(root="./data", train=False, download=True)
+            ret = [torch.tensor(i) for i in (train.data, train.targets, test.data, test.targets)]
+            for i in [0, 2]:
+                ret[i] = ret[i].float().to("cuda").view(-1, 1, 28, 28)
+            return GPUDataset(ret[0], ret[1]), GPUDataset(ret[2], ret[3])
+        
 
 class LiftedTransform:
     """

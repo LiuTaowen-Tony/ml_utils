@@ -189,7 +189,8 @@ def download_wandb(project_name: str, directory: str = "experiment_metrics"):
     pd.DataFrame(configs).to_csv(config_path, index=False)
 
 
-class ExperimentMetrics:
+class ExperimentRecord:
+    NUM_SAMPLES = 100
     def __init__(self, directory: str, lazy=False):
         """
         Initialize the ExperimentLoader.
@@ -205,6 +206,7 @@ class ExperimentMetrics:
         if not lazy:
             self._load_runs_summary()
             self._load_runs()
+            self._load_or_build_run_metric_summary()
 
     def _load_runs_summary(self):
         """
@@ -218,7 +220,6 @@ class ExperimentMetrics:
                 print(f"Failed to load experiment configuration: {e}")
         else:
             print(f"Experiment configuration file not found at {config_path}")
-
 
     def _load_runs(self):
         for run_id in self.run_ids:
@@ -234,45 +235,64 @@ class ExperimentMetrics:
                 print(f"Run file for {run_id} not fou d.")
                 raise FileNotFoundError(f"Run file for {run_id} not found.")
 
+    def _build_run_metric_summary(self, num_samples=None):
+        if num_samples is None:
+            num_samples = self.NUM_SAMPLES
+        for id, run in self.runs.items():
+            run_metrics = run.columns
+            break
+        run_metrics_summary = {key: [] for key in run_metrics}
+        run_metrics_summary["run_id"] = []
 
-    def save(self, directory, experiment_name):
-        """
-        Save the experiment configuration and metrics to a directory.
+        for id, run in self.runs.items():
+            for key in run:
+                run_metrics_summary[key].append(run[key].iloc[-num_samples:].mean())
+            run_metrics_summary["run_id"].append(id)
+        run_metrics_summary_df = pd.DataFrame(run_metrics_summary)
+        self.runs_summary = self.runs_summary.merge(run_metrics_summary_df, how="left", on="run_id", suffixes=("", "_run"))
 
-        Args:
-            directory (str): The directory to save the experiment data.
-        """
-        os.makedirs(os.path.join(directory, experiment_name), exist_ok=True)
-        self.runs_summary.to_csv(os.path.join(directory, experiment_name, "runs_summary.csv"), index=False)
+    def _load_or_build_run_metric_summary(self):
+        for id, run in self.runs.items():
+            run_metrics = run.columns
+            break
+        run_config_summary_columns = self.runs_summary.columns
+        # run metrics are not in the config summary
+        if not all([i in run_config_summary_columns for i in run_metrics]):
+            self._build_run_metric_summary()
+        self.runs_summary.drop(columns=[i for i in self.runs_summary.columns if "_run" in i], inplace=True)
+
+    def config_columns(self):
+        self.runs_summary.drop(columns=[i for i in self.runs_summary.columns if "_run" in i], inplace=True)
+        return [i for i in self.runs_summary.columns if i not in self.metric_columns()]
+
+    def metric_columns(self):
+        for _, run in self.runs.items():
+            return [i for i in run.columns]
+
+    def save_summary(self, directory = None):
+        if directory is None:
+            directory = self.directory
+        os.makedirs(os.path.join(directory), exist_ok=True)
+        self.runs_summary.to_csv(
+            os.path.join(directory, "runs_summary.csv"), index=False
+        )
+
+    def save(self, directory = None):
+        if directory is None:
+            directory = self.directory
+        self.save_summary(directory)
         for run_id in self.runs:
-            self._runs[run_id].to_csv(os.path.join(directory, experiment_name,f"run_{run_id}.csv"), index=False)
+            self._runs[run_id].to_csv(os.path.join(directory, f"run_{run_id}.csv"), index=False)
 
     @property
     def runs(self):
         return self._runs
 
     def __getitem__(self, run_id: str):
-        """
-        Get the metrics for a specific run, loading on demand if necessary.
-
-        Args:
-            run_id (str): The ID of the run.
-
-        Returns:
-            pd.DataFrame: The metrics for the specified run, or None if not found.
-        """
         return self.runs[run_id]
-
-      
 
     @property
     def run_ids(self) -> List[str]:
-        """
-        List all run IDs available in the experiment from the experiment configuration.
-
-        Returns:
-            List[str]: A list of run IDs.
-        """
         if self.runs_summary is not None:
             return [i for i in self.runs_summary["run_id"]]
         else:
