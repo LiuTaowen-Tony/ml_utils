@@ -246,7 +246,7 @@ class ExperimentRecord:
 
         for id, run in self.runs.items():
             for key in run:
-                run_metrics_summary[key].append(run[key].iloc[-num_samples:].mean())
+                run_metrics_summary[key].append(run[key].iloc[-num_samples:].median())
             run_metrics_summary["run_id"].append(id)
         run_metrics_summary_df = pd.DataFrame(run_metrics_summary)
         self.runs_summary = self.runs_summary.merge(run_metrics_summary_df, how="left", on="run_id", suffixes=("", "_run"))
