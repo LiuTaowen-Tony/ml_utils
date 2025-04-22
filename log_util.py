@@ -172,14 +172,16 @@ class Logger:
 
 def download_wandb(project_name: str, directory: str = "experiment_metrics"):
     import wandb
-    api = wandb.Api()
+    api = wandb.Api(overrides=dict(entity="quantized-sgd"))
     runs = api.runs(project_name)
 
     os.makedirs(os.path.join(directory, project_name), exist_ok=True)
 
     config_path = os.path.join(directory, project_name, "runs_summary.csv")
     configs = []
-    for run  in tqdm(runs):
+    print(len(runs))
+    for i, run  in enumerate(runs):
+        print(i, end=",")
         config = run.config
         config["run_id"] = run.id
         configs.append(config)
@@ -244,9 +246,18 @@ class ExperimentRecord:
         run_metrics_summary = {key: [] for key in run_metrics}
         run_metrics_summary["run_id"] = []
 
+        # q25, q50, q75
         for id, run in self.runs.items():
             for key in run:
-                run_metrics_summary[key].append(run[key].iloc[-num_samples:].median())
+                run_metrics_summary[key].append(run[key].iloc[num_samples:].min())
+                if key == "train_set_grad_norm":
+                    print(run[key])
+                    print(run[key].iloc[num_samples:])
+                    print(run[key].iloc[num_samples:].median())
+                    print(run[key].iloc[num_samples:].mean())
+                    print(run[key].iloc[num_samples:].max())
+                    print(run[key].iloc[num_samples:].min())
+
             run_metrics_summary["run_id"].append(id)
         run_metrics_summary_df = pd.DataFrame(run_metrics_summary)
         self.runs_summary = self.runs_summary.merge(run_metrics_summary_df, how="left", on="run_id", suffixes=("", "_run"))
