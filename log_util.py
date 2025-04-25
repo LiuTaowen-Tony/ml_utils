@@ -172,8 +172,9 @@ class Logger:
 
 def download_wandb(project_name: str, directory: str = "experiment_metrics"):
     import wandb
-    api = wandb.Api(overrides=dict(entity="quantized-sgd"))
+    api = wandb.Api(overrides=dict())#entity="quantized-sgd"))
     runs = api.runs(project_name)
+
 
     os.makedirs(os.path.join(directory, project_name), exist_ok=True)
 
@@ -184,9 +185,10 @@ def download_wandb(project_name: str, directory: str = "experiment_metrics"):
         print(i, end=",")
         config = run.config
         config["run_id"] = run.id
+        run: wandb.Run
         configs.append(config)
         run_path = os.path.join(directory, project_name, f"run_{run.id}.csv")
-        run.history().to_csv(run_path, index=False)
+        run.history(20000).to_csv(run_path, index=False)
 
     pd.DataFrame(configs).to_csv(config_path, index=False)
 
@@ -250,13 +252,6 @@ class ExperimentRecord:
         for id, run in self.runs.items():
             for key in run:
                 run_metrics_summary[key].append(run[key].iloc[num_samples:].min())
-                if key == "train_set_grad_norm":
-                    print(run[key])
-                    print(run[key].iloc[num_samples:])
-                    print(run[key].iloc[num_samples:].median())
-                    print(run[key].iloc[num_samples:].mean())
-                    print(run[key].iloc[num_samples:].max())
-                    print(run[key].iloc[num_samples:].min())
 
             run_metrics_summary["run_id"].append(id)
         run_metrics_summary_df = pd.DataFrame(run_metrics_summary)
