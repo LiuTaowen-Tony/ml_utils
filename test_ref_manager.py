@@ -16,8 +16,13 @@ class ReferenceManager:
         test_file_name = Path(test_file_path).stem
         self.reference_file = self.reference_dir / f"{test_file_name}.json"
 
-    def compare(self, data: torch.Tensor, key: str, atol: float = 1e-6, rtol: float = 1e-6):
-        if self.store_reference:
+    def compare(self, 
+                data: torch.Tensor, 
+                key: str, 
+                atol: float = 1e-6, 
+                rtol: float = 1e-6,
+                store_reference: bool = False):
+        if self.store_reference or store_reference:
             self._store_reference_data(key, data)
         else:
             ref_data = self._load_reference_data(key)
