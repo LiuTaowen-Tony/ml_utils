@@ -4,6 +4,10 @@ import random
 import os
 import torch
 import torch.distributed as dist
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import StateDictType, FullStateDictConfig
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+import functools
 
 class AllGatherFunction(torch.autograd.Function):
     @staticmethod
@@ -130,7 +134,96 @@ def apply_dist_sampler(dataloader: torch.utils.data.DataLoader, shuffle: bool = 
         batch_size=dataloader.batch_size,
         sampler=sampler,
         num_workers=dataloader.num_workers,
-        pin_memory=True,
+        pin_memory=dataloader.pin_memory,
+        collate_fn=dataloader.collate_fn,  # Preserve collate function
+        drop_last=dataloader.drop_last,    # Preserve drop_last setting
+        timeout=dataloader.timeout,        # Preserve timeout
+        worker_init_fn=dataloader.worker_init_fn,  # Preserve worker init
+    )
+
+def save_fsdp_model(model: FSDP, save_path: str, offload_to_cpu: bool = True) -> None:
+    """
+    Save FSDP model state dict properly to avoid hanging.
+    
+    Args:
+        model: FSDP wrapped model
+        save_path: Path to save the model
+        offload_to_cpu: Whether to offload state dict to CPU during save
+    """
+    rank0_print(f"Saving FSDP model to {save_path}...")
+    
+    with FSDP.state_dict_type(
+        model, 
+        StateDictType.FULL_STATE_DICT, 
+        FullStateDictConfig(offload_to_cpu=offload_to_cpu, rank0_only=True)
+    ):
+        state_dict = model.state_dict()
+        if is_rank_0():
+            torch.save(state_dict, save_path)
+            rank0_print(f"Model saved successfully to {save_path}")
+
+def cleanup_distributed_training(run=None, finish_wandb: bool = True) -> None:
+    """
+    Clean up distributed training resources.
+    
+    Args:
+        run: WandB run object to finish (optional)
+        finish_wandb: Whether to finish WandB run
+    """
+    rank0_print("Cleaning up distributed training...")
+    
+    if finish_wandb and run is not None:
+        try:
+            if is_rank_0():
+                rank0_print("Finishing WandB...")
+                if hasattr(run, 'finish'):
+                    run.finish()
+                rank0_print("WandB finished successfully")
+        except Exception as e:
+            rank0_print(f"WandB cleanup error: {e}")
+    
+    rank0_print("Distributed training cleanup completed")
+
+def log_training_metrics(run, global_step: int, loss_accum: float, samples_accum: int, 
+                        device: torch.device, optimizer, log_every_n_steps: int = 1) -> None:
+    """
+    Log training metrics with proper distributed synchronization.
+    
+    Args:
+        run: WandB run object
+        global_step: Current training step
+        loss_accum: Accumulated loss
+        samples_accum: Accumulated samples
+        device: Device for synchronization
+        optimizer: Optimizer for learning rate
+        log_every_n_steps: How often to log
+    """
+    if global_step % log_every_n_steps != 0:
+        return
+        
+    loss_sum = scalar_all_reduce(loss_accum, device, "sum")
+    samples_sum = scalar_all_reduce(samples_accum, device, "sum")
+    current_lr = optimizer.param_groups[0]['lr']
+    
+    run.log({
+        "train_loss": loss_sum / samples_sum,
+        "learning_rate": current_lr
+    }, step=global_step)
+    rank0_print(f"Step {global_step:06d} | train_loss={loss_sum / samples_sum:.4f} | lr={current_lr:.2e}")
+
+def create_fsdp_auto_wrap_policy(transformer_layer_cls):
+    """
+    Create FSDP auto-wrap policy for transformer models.
+    
+    Args:
+        transformer_layer_cls: Set of transformer layer classes to wrap
+        
+    Returns:
+        Configured auto-wrap policy
+    """
+    return functools.partial(
+        transformer_auto_wrap_policy,
+        transformer_layer_cls=transformer_layer_cls,
     )
 
 # class DistContext:
