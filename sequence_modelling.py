@@ -18,16 +18,16 @@ def boolean_triangular_mask(flat_mask: torch.Tensor) -> torch.BoolTensor:
 
     # external product of flat_mask with itself
     tri_mask = flat_mask.unsqueeze(2) & flat_mask.unsqueeze(1)
-    
+
     # upper triangular mask
-    upper_mask = torch.triu(torch.ones(seq_len, seq_len, dtype=torch.bool, device=flat_mask.device), diagonal=1)
+    upper_mask = torch.triu(
+        torch.ones(seq_len, seq_len, dtype=torch.bool, device=flat_mask.device),
+        diagonal=1,
+    )
     lower_mask = upper_mask.logical_not()
 
     tri_mask = tri_mask & lower_mask
     return tri_mask
-
-
-
 
     # # tri_mask = torch.triu(torch.ones(batch_size, seq_len, seq_len, dtype=torch.bool), diagonal=1)
     # # tri_mask = tri_mask.logical_not()
@@ -35,80 +35,67 @@ def boolean_triangular_mask(flat_mask: torch.Tensor) -> torch.BoolTensor:
     # return flat_mask.unsqueeze(1) & tri_mask
 
 
-def pad_to_length(tensor: torch.Tensor, length: int, pad_value: typing.Union[int, float], dim: int = -1) -> torch.Tensor:
-    """ Pad a tensor to a specific length along a specific dimension
-    """
+def pad_to_length(
+    tensor: torch.Tensor,
+    length: int,
+    pad_value: typing.Union[int, float],
+    dim: int = -1,
+) -> torch.Tensor:
+    """Pad a tensor to a specific length along a specific dimension"""
     if tensor.size(dim) >= length:
         return tensor
     else:
         pad_size = list(tensor.shape)
         pad_size[dim] = length - tensor.size(dim)
-        return torch.cat([tensor, pad_value * torch.ones(*pad_size, dtype=tensor.dtype, device=tensor.device)], dim=dim)
+        return torch.cat(
+            [
+                tensor,
+                pad_value
+                * torch.ones(*pad_size, dtype=tensor.dtype, device=tensor.device),
+            ],
+            dim=dim,
+        )
 
 
 def extract_anthropic_prompt(prompt_and_response):
     """Extract the anthropic prompt from a prompt and response pair."""
-    search_term = '\n\nAssistant:'
+    search_term = "\n\nAssistant:"
     search_term_idx = prompt_and_response.rfind(search_term)
-    assert search_term_idx != -1, f"Prompt and response does not contain '{search_term}'"
-    return prompt_and_response[:search_term_idx + len(search_term)]
+    assert (
+        search_term_idx != -1
+    ), f"Prompt and response does not contain '{search_term}'"
+    return prompt_and_response[: search_term_idx + len(search_term)]
 
 
 def strip_html_tags(html_string):
     from bs4 import BeautifulSoup, NavigableString
+
     """Strip HTML tags from a string, except for <code> tags (which contain real code in the StackExchange answers)."""
     # Create a BeautifulSoup object
-    soup = BeautifulSoup(html_string, 'html.parser')
+    soup = BeautifulSoup(html_string, "html.parser")
 
     # Initialize an empty list to store the text
     text = []
     for element in soup.children:
         if isinstance(element, NavigableString):
             continue
-        if element.name == 'p':
-            text.append(''.join(child.string for child in element.children if isinstance(child, NavigableString)))
-        elif element.name == 'pre':
-            for code in element.find_all('code'):
+        if element.name == "p":
+            text.append(
+                "".join(
+                    child.string
+                    for child in element.children
+                    if isinstance(child, NavigableString)
+                )
+            )
+        elif element.name == "pre":
+            for code in element.find_all("code"):
                 text.append("<code>" + code.get_text() + "</code>")
-        elif element.name == 'code':
+        elif element.name == "code":
             text.append("<code>" + element.get_text() + "</code>")
 
     # Join the text together with newlines in between
     text = "\n\n".join(text)
 
-    return text
-
-
-def apply_chat_template(
-    messages,
-    system_start_token,
-    user_start_token,
-    assistant_start_token,
-    end_of_turn_token,
-):
-    assert isinstance(system_start_token, str)
-    assert isinstance(user_start_token, str)
-    assert isinstance(assistant_start_token, str)
-    assert isinstance(end_of_turn_token, str)
-    if not system_start_token.endswith(" "):
-        system_start_token += " "
-    if not user_start_token.endswith(" "):
-        user_start_token += " "
-    if not assistant_start_token.endswith(" "):
-        assistant_start_token += " "
-    # Apply a chat template to messages
-    text = ""
-    for message in messages:
-        if message["role"] == "user":
-            text += f"{user_start_token}\n{message['content']}\n{end_of_turn_token}\n"
-        elif message["role"] == "assistant":
-            text += (
-                f"{assistant_start_token}\n{message['content']}\n{end_of_turn_token}\n"
-            )
-        elif message["role"] == "system":
-            text += f"{system_start_token}\n{message['content']}\n{end_of_turn_token}\n"
-        else:
-            raise ValueError(f"Unknown message role: {message['role']}")
     return text
 
 
@@ -133,26 +120,6 @@ def find_token_sequence(input_ids: torch.Tensor, token_sequence: torch.Tensor):
             matches.append(i)
 
     return torch.tensor(matches, dtype=torch.long)
-
-
-def tokenize_encode_pad_max_len(tokenizer: PreTrainedTokenizerFast, max_seq_len, text):
-    """
-    Tokenize and encode a text string
-
-    :param tokenizer: Tokenizer object
-    :param text: Input text
-    :return: input_ids and attention_mask
-    """
-    # Tokenize and encode the text
-    encoding = tokenizer.encode_plus(
-        text,
-        padding="max_length",
-        max_length=max_seq_len,
-        truncation=True,
-        return_tensors="pt",
-    )
-
-    return {"input_ids": encoding["input_ids"], "attn_mask": encoding["attention_mask"]}
 
 
 def mask_between_tokens(input_ids, start_tokens, end_tokens):
@@ -196,8 +163,42 @@ def apply_next_token_shift(
     :param input_ids: Input token ids tensor
     :return: Shifted input_ids
     """
-    assert input_ids.dim() == 1
 
     labels = torch.full_like(input_ids, -100)
-    labels[:-1] = input_ids[1:]
+    if input_ids.dim() == 1:
+        labels[:-1] = input_ids[1:]
+    elif input_ids.dim() == 2:
+        labels[:, :-1] = input_ids[:, 1:]
+    else:
+        raise ValueError(
+            f"Input_ids should be a 1D or 2D tensor, got {input_ids.dim()}D"
+        )
     return labels
+
+
+def tokenizing_collate_fn(
+    tokenizer: PreTrainedTokenizerFast, max_seq_len: int, batch: list[dict]
+):
+    strs = [x["text"] for x in batch]
+    encoding = tokenizer(
+        strs,
+        truncation=True,
+        padding="max_length",
+        max_length=max_seq_len,
+        return_tensors="pt",
+    )
+    input_ids = encoding["input_ids"]
+
+    # Shift labels by one position to the right
+    labels = input_ids.clone()
+    labels = torch.cat([labels[:, 1:], labels[:, :1]], dim=1)  # Shift left
+    labels[labels == tokenizer.pad_token_id] = -100
+
+    token_count = (input_ids != tokenizer.pad_token_id).sum().item()
+    return {
+        "input_ids": input_ids,
+        "labels": labels,
+        "token_count": token_count,
+        "attention_mask": encoding["attention_mask"],
+        "text": strs,
+    }

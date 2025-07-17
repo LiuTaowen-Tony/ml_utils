@@ -8,6 +8,21 @@ from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import StateDictType, FullStateDictConfig
 from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
 import functools
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def to_device(item: T, device: torch.device) -> T:
+    if isinstance(item, torch.Tensor):
+        return item.to(device)
+    elif isinstance(item, torch.nn.Module):
+        return item.to(device)
+    elif isinstance(item, list):
+        return [to_device(t, device) for t in item]
+    elif isinstance(item, dict):
+        return {k: to_device(v, device) for k, v in item.items()}
+    else:
+        return item
 
 class AllGatherFunction(torch.autograd.Function):
     @staticmethod
