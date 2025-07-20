@@ -179,26 +179,29 @@ def apply_next_token_shift(
 def tokenizing_collate_fn(
     tokenizer: PreTrainedTokenizerFast, max_seq_len: int, batch: list[dict]
 ):
+    global showed_collate_fn
     strs = [x["text"] for x in batch]
     encoding = tokenizer(
         strs,
         truncation=True,
-        padding="max_length",
+        padding="longest",
         max_length=max_seq_len,
         return_tensors="pt",
     )
     input_ids = encoding["input_ids"]
 
     # Shift labels by one position to the right
-    labels = input_ids.clone()
-    labels = torch.cat([labels[:, 1:], labels[:, :1]], dim=1)  # Shift left
+    labels = torch.full_like(input_ids, -100)
+    labels[:, :-1] = input_ids[:, 1:]
     labels[labels == tokenizer.pad_token_id] = -100
 
     token_count = (input_ids != tokenizer.pad_token_id).sum().item()
-    return {
+    result =  {
         "input_ids": input_ids,
         "labels": labels,
         "token_count": token_count,
         "attention_mask": encoding["attention_mask"],
         "text": strs,
     }
+
+    return result
