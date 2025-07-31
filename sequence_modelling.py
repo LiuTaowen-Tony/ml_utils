@@ -176,32 +176,40 @@ def apply_next_token_shift(
     return labels
 
 
-def tokenizing_collate_fn(
-    tokenizer: PreTrainedTokenizerFast, max_seq_len: int, batch: list[dict]
-):
-    global showed_collate_fn
-    strs = [x["text"] for x in batch]
-    encoding = tokenizer(
-        strs,
-        truncation=True,
-        padding="longest",
-        max_length=max_seq_len,
-        return_tensors="pt",
-    )
-    input_ids = encoding["input_ids"]
+class TokenizingCollateFn:
+    def __init__(
+        self,
+        tokenizer: PreTrainedTokenizerFast,
+        max_seq_len: int,
+        padding: typing.Literal["longest", "max_length"] = "longest",
+    ):
+        self.tokenizer = tokenizer
+        self.max_seq_len = max_seq_len
+        self.padding = padding
 
-    # Shift labels by one position to the right
-    labels = torch.full_like(input_ids, -100)
-    labels[:, :-1] = input_ids[:, 1:]
-    labels[labels == tokenizer.pad_token_id] = -100
+    def __call__(self, batch: list[dict]):
+        strs = [x["text"] for x in batch]
+        encoding = self.tokenizer(
+            strs,
+            truncation=True,
+            padding=self.padding,
+            max_length=self.max_seq_len,
+            return_tensors="pt",
+        )
+        input_ids = encoding["input_ids"]
 
-    token_count = (input_ids != tokenizer.pad_token_id).sum().item()
-    result =  {
-        "input_ids": input_ids,
-        "labels": labels,
-        "token_count": token_count,
-        "attention_mask": encoding["attention_mask"],
-        "text": strs,
-    }
+        # Shift labels by one position to the right
+        labels = torch.full_like(input_ids, -100)
+        labels[:, :-1] = input_ids[:, 1:]
+        labels[labels == self.tokenizer.pad_token_id] = -100
 
-    return result
+        token_count = (input_ids != self.tokenizer.pad_token_id).sum().item()
+        result =  {
+            "input_ids": input_ids,
+            "labels": labels,
+            "token_count": token_count,
+            "attention_mask": encoding["attention_mask"],
+            "text": strs,
+        }
+
+        return result
