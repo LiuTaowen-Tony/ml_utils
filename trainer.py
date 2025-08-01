@@ -196,23 +196,24 @@ class ModelRunner:
         # Git tagging setup
         self.auto_tag_experiments = auto_tag_experiments
         if git_tagger is None and auto_tag_experiments:
-            self.git_tagger = GitTagger(
-                tag_prefix="train-exp",
+            git_tagger = GitTagger(
+                tag_prefix="exp",
                 max_tags_to_keep=50,  # Reasonable default for training
                 strict_temp_check=False,  # Don't be too strict during training
                 auto_stash_temp_files=True,  # Auto-handle temp files
             )
-        else:
-            self.git_tagger = git_tagger
 
+        self.git_tagger = git_tagger
         self.fabric.launch()
         
     def init_wandb(self, experiment_config: dict) -> "wandb.Run":
         if self.fabric.is_global_zero:
+            name = experiment_config.get("name", None)
             return  wandb.init(
                 project=experiment_config["project_name"],
                 entity=experiment_config["entity"],
-                config=experiment_config
+                config=experiment_config,
+                name=name,
             )
         else:
             class _Dummy:  # makes .log() a no‑op on workers
@@ -302,8 +303,7 @@ class ModelRunner:
         
         # Create git tag for this experiment run and link to wandb
         if self.auto_tag_experiments and self.git_tagger is not None:
-            experiment_name = hyper_params.get("experiment_name", hyper_params.get("project_name", "unnamed"))
-            
+            experiment_name = hyper_params["project_name"] + "-" + self.wandb.name
             # Create git tag with minimal info (wandb has the config)
             tag_name = self.git_tagger.create_experiment_tag(
                 experiment_name=experiment_name,
@@ -311,18 +311,16 @@ class ModelRunner:
                 push_to_remote=False
             )
             
-            if tag_name and hasattr(self.wandb, 'log'):
-                # Link wandb run to git state
-                git_info = {
-                    "git_tag": tag_name,
-                    "git_commit": self.git_tagger._get_current_commit_hash(short=False),
-                    "git_branch": self.git_tagger._run_git_command(["git", "branch", "--show-current"]),
-                    "git_dirty": bool(self.git_tagger._get_uncommitted_files()["regular"])
-                }
-                self.wandb.log(git_info)
-                # Also add to wandb config for easy access
-                if hasattr(self.wandb, 'config'):
-                    self.wandb.config.update(git_info)
+            git_info = {
+                "git_tag": tag_name,
+                "git_commit": self.git_tagger._get_current_commit_hash(short=False),
+                "git_branch": self.git_tagger._run_git_command(["git", "branch", "--show-current"]),
+                "git_dirty": bool(self.git_tagger._get_uncommitted_files()["regular"])
+            }
+            self.wandb.log(git_info)
+            # Also add to wandb config for easy access
+            if hasattr(self.wandb, 'config'):
+                self.wandb.config.update(git_info)
         
         algorithm.on_train_epoch_start()
         self.loss_weight_sum = 0.0
