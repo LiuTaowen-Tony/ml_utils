@@ -213,3 +213,7 @@ class TokenizingCollateFn:
         }
 
         return result
+
+
+# DataCollator takes list of dicts
+# Batch map in datasets takes list of dicts
