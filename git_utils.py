@@ -86,6 +86,10 @@ class GitTagger:
             print("⚠️  Not in a git repository, skipping tag creation")
             return None
         
+        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+        # Create tag name with timestamp
+        tag_name = f"{experiment_name}-{timestamp}"
+
         # Check for non-temporary uncommitted files
         non_temp_files = self._get_non_temp_files()
         
@@ -101,9 +105,8 @@ class GitTagger:
                 self._run_git_command(["git", "add", file])
             
             # Create commit
-            commit_message = f"Experiment: {experiment_name}"
-            if self._run_git_command(["git", "commit", "-m", commit_message]):
-                print(f"✅ Created commit: {commit_message}")
+            if self._run_git_command(["git", "commit", "-m", tag_name]):
+                print(f"✅ Created commit: {tag_name}")
             else:
                 print("❌ Failed to create commit")
                 return None
@@ -116,15 +119,9 @@ class GitTagger:
                 print(f"    ... and {len(non_temp_files) - 3} more")
             print("💡 Use auto_commit=True to commit automatically")
         
-        # Create tag name with timestamp
-        timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        tag_name = f"{experiment_name}-{timestamp}"
-        
-        # Create simple tag message
-        tag_message = f"Experiment: {experiment_name}\nTimestamp: {datetime.datetime.now().isoformat()}"
         
         # Create the tag
-        if self._run_git_command(["git", "tag", "-a", tag_name, "-m", tag_message]):
+        if self._run_git_command(["git", "tag", "-a", tag_name, "-m", tag_name]):
             print(f"✅ Created git tag: {tag_name}")
             return tag_name
         else:
@@ -145,7 +142,7 @@ class GitTagger:
         return tags[:limit]
 
 
-def git_tag(experiment_name: str, auto_commit: bool = False) -> Optional[str]:
+def git_tag(experiment_name: str, auto_commit: bool = True) -> Optional[str]:
     """Quick function to create an experiment tag with optional auto-commit."""
     tagger = GitTagger()
     return tagger.create_tag(experiment_name, auto_commit=auto_commit)
