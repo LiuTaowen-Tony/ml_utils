@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, Union
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
 
-class FSDPComponentCheckpointer:
+class Checkpointer:
     """
     Checkpointer designed to save specific components from models (FSDP or non-FSDP).
     
