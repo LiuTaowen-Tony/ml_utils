@@ -1,4 +1,4 @@
-from ml_utils.sequence_modelling import patch_chat_template, ChatCollateFn, prepare_chat_messages_for_training
+from ml_utils.data.sequence import patch_chat_template, ChatCollateFn, force_llama_chat_template
 
 
 def example_chat_training():
@@ -15,25 +15,27 @@ def example_chat_training():
     print(tokenizer.chat_template)
     chat_template = patch_chat_template(chat_template)
     tokenizer.chat_template = chat_template
+    tokenizer.chat_template = force_llama_chat_template()
 
     print("\n=== Batch Processing Example ===")
     
     batch_data = [
         {
             "messages": [
+                {"role": "system", "content": "You are a math tutor."},
                 {"role": "user", "content": "Hello!"},
                 {"role": "assistant", "content": "Hi there! How can I help you today?"}
             ]
         },
         {
             "messages": [
-                {"role": "system", "content": "You are a math tutor."},
                 {"role": "user", "content": "What's 2+2?"},
                 {"role": "assistant", "content": "2+2 equals 4."}
             ]
         },
         {
             "messages": [
+                {"role": "system", "content": "You are a math tutor."},
                 {"role": "user", "content": "Tell me a joke."},
                 {"role": "assistant", "content": "Why don't scientists trust atoms? Because they make up everything!"}
             ]
@@ -53,10 +55,11 @@ def example_chat_training():
     # Process batch
     batch_result = collate_fn(batch_data)
     
-    print(batch_result['text'][0])
-    print(batch_result['input_ids'][0])
-    print(batch_result['labels'][0])
-    print(batch_result['attention_mask'][0])
+    for i in range(len(batch_result['text'])):
+        print(batch_result['text'][i])
+        print(batch_result['input_ids'][i])
+        print(batch_result['labels'][i])
+        print(batch_result['attention_mask'][i])
 
     
         

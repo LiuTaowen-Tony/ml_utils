@@ -1,9 +1,8 @@
 import json
 import inspect
 import torch
-import numpy as np
 from torch.utils.data import Dataset, IterableDataset
-import torchvision
+from typing import Sequence
 
 def load_jsonl(file_path):
     with open(file_path, "r") as f:
@@ -13,6 +12,31 @@ def save_jsonl(file_path, data):
     with open(file_path, "w") as f:
         for item in data:
             f.write(json.dumps(item) + "\n")
+
+
+def batch_map_to_collator_format(batch: dict[str, Sequence]):
+    for key in batch:
+        first_key = key
+        break
+    len_result = len(batch[first_key])
+    result = [{} for _ in range(len_result)]
+
+    for key in batch:
+        value_list = batch[key]
+        for i, value in enumerate(value_list):
+            result[i][key] = value
+    return result
+
+def collator_to_batch_map_format(batch: list[dict]):
+    result = {}
+    for key in batch[0]:
+        result[key] = [x[key] for x in batch]
+    return result
+
+# DataCollator takes list of dicts returns dict of lists
+# Batch map in datasets takes dict of lists returns dict of lists
+
+
 
 class IterableSubset(IterableDataset):
     def __init__(self, dataset: Dataset, max_length: int, start: int = 0):
@@ -182,43 +206,3 @@ class LiftedTransform:
 
 #         return results
 #     return batch_lifted_transformimport torch
-
-class Cutout(object):
-    """Randomly mask out one or more patches from an image.
-
-    Args:
-        n_holes (int): Number of patches to cut out of each image.
-        length (int): The length (in pixels) of each square patch.
-    """
-    def __init__(self, n_holes, length):
-        self.n_holes = n_holes
-        self.length = length
-
-    def __call__(self, img):
-        """
-        Args:
-            img (Tensor): Tensor image of size (C, H, W).
-        Returns:
-            Tensor: Image with n_holes of dimension length x length cut out of it.
-        """
-        h = img.size(1)
-        w = img.size(2)
-
-        mask = np.ones((h, w), np.float32)
-
-        for n in range(self.n_holes):
-            y = np.random.randint(h)
-            x = np.random.randint(w)
-
-            y1 = np.clip(y - self.length // 2, 0, h)
-            y2 = np.clip(y + self.length // 2, 0, h)
-            x1 = np.clip(x - self.length // 2, 0, w)
-            x2 = np.clip(x + self.length // 2, 0, w)
-
-            mask[y1: y2, x1: x2] = 0.
-
-        mask = torch.from_numpy(mask)
-        mask = mask.expand_as(img)
-        img = img * mask
-
-        return img
