@@ -57,9 +57,8 @@ def example_chat_training():
     
     for i in range(len(batch_result['text'])):
         print(batch_result['text'][i])
-        print(batch_result['input_ids'][i])
-        print(batch_result['labels'][i])
-        print(batch_result['attention_mask'][i])
+        for (input_ids, attn, assist) in zip(batch_result['input_ids'][i], batch_result['attention_mask'][i], batch_result['loss_mask'][i]):
+            print(input_ids.item(), attn.item(), assist.item())
 
     
         

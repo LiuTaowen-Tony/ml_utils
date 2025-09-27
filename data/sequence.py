@@ -16,7 +16,7 @@ def force_llama_chat_template():
 {{ sh }}{{ message['role'] }}{{ eh }}
 
 {%- if message['role'] == 'assistant' -%}
-{% generation %}{{ message['content'] | trim }}{% endgeneration %}{{ eot }}
+{% generation %}{{ message['content'] | trim }}{{ eot }}{% endgeneration %}
 {%- else -%}
 {{ message['content'] | trim }}{{ eot }}
 {%- endif -%}
@@ -112,14 +112,12 @@ class ChatCollateFn:
         self,
         tokenizer: PreTrainedTokenizerFast,
         max_seq_len: int,
-        ignore_index: int = -100,
         padding: typing.Literal["longest", "max_length"] = "longest",
         messages_key: str = "messages",
         pad_to_multiple_of: int = 16,
     ):
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
-        self.ignore_index = ignore_index
         self.padding = padding
         self.messages_key = messages_key
         self.pad_to_multiple_of = pad_to_multiple_of
@@ -148,12 +146,11 @@ class ChatCollateFn:
             tokenizer_kwargs={ "pad_to_multiple_of": self.pad_to_multiple_of }
         )
         input_ids = result['input_ids']
-        assistant_mask = result['assistant_masks'].bool()
         
         # Create labels: mask non-assistant tokens with ignore_index
-        labels = torch.full_like(input_ids, self.ignore_index)
-        labels[:, :-1] = input_ids[:, 1:]
-        labels[~assistant_mask] = self.ignore_index
+        # labels = torch.full_like(input_ids, self.ignore_index)
+        # labels[:, :-1] = input_ids[:, 1:]
+        # labels[~assistant_mask] = self.ignore_index
         
         # Create attention mask (all tokens are attended to)
         str_messages = self.tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
@@ -161,7 +158,7 @@ class ChatCollateFn:
         return {
             'text': str_messages,
             'input_ids': input_ids,
-            'labels': labels,
+            'loss_mask': result['assistant_masks'].bool(),
             'attention_mask': result['attention_mask'],
         }
 
